@@ -1,7 +1,8 @@
-# Khutbah Generator
+# Friday Sermon Generator
 
 Generator PDF **naskah khutbah Jum'at** siap cetak / siap baca di mimbar.
-Cukup tulis isi khutbah dalam file teks sederhana, lalu script ini menyusunnya
+Ambil transkrip ceramah (mis. dari YouTube), rapikan dengan AI memakai template
+prompt yang disediakan, lalu script ini menyusunnya
 menjadi PDF A4 lengkap dengan bacaan pembuka, penutup, dan khutbah kedua
 berbahasa Arab berharakat.
 
@@ -33,8 +34,8 @@ sudo apt install libpango-1.0-0 libpangoft2-1.0-0
 Lalu install dependensi Python:
 
 ```bash
-git clone https://github.com/<username>/khutbah-generator.git
-cd khutbah-generator
+git clone https://github.com/rezaafaisal/friday-sermon-generator.git
+cd friday-sermon-generator
 
 python -m venv .venv
 source .venv/bin/activate
@@ -44,6 +45,62 @@ pip install -r requirements.txt
 > Font **Amiri** dan **Scheherazade New** diambil dari Google Fonts saat
 > generate, jadi perlu koneksi internet. Jika offline, install font tersebut di
 > sistem agar teks Arab tetap tampil rapi.
+
+## Alur kerja
+
+```
+Video YouTube / rekaman ──► Transkrip mentah ──► (AI + template prompt) ──► inputs/*.txt ──► main.py ──► PDF
+         langkah 1                                      langkah 2                         langkah 3
+```
+
+### Langkah 1 — Siapkan transkrip
+
+Ambil teks dari video ceramah/khutbah. Pilih salah satu cara:
+
+- **YouTube (manual):** buka video → `...` di bawah video → **Tampilkan transkrip**
+  → salin semua teksnya.
+- **YouTube (otomatis, pakai [yt-dlp](https://github.com/yt-dlp/yt-dlp)):**
+
+  ```bash
+  pip install yt-dlp
+  yt-dlp --skip-download --write-auto-subs --sub-langs id --convert-subs srt \
+    -o "transcripts/%(title)s.%(ext)s" "https://www.youtube.com/watch?v=XXXX"
+  ```
+
+  Hasilnya file `.srt` di folder `transcripts/` (timestamp tidak masalah, nanti
+  dibersihkan AI). Ganti `--sub-langs id` sesuai bahasa video.
+- **Rekaman audio / video lain:** gunakan layanan speech-to-text
+  (mis. Whisper, fitur transkrip Google Docs/Recorder, dll).
+
+### Langkah 2 — Rapikan transkrip ke format input
+
+Transkrip mentah **belum** sesuai format yang dibutuhkan (masih ada timestamp,
+kata pengisi, pembuka/penutup khutbah, dan ayat belum ditulis dalam huruf Arab).
+
+Gunakan template prompt di
+[`prompts/transcript-to-khutbah.md`](prompts/transcript-to-khutbah.md):
+
+1. Salin prompt, isi `{{JUDUL}}`, `{{KHATIB}}`, dan tempel transkrip ke
+   `{{TRANSKRIP}}`.
+2. Kirim ke AI chat (Claude, ChatGPT, Gemini, dll).
+3. Simpan jawabannya sebagai `inputs/<nama>.txt`.
+
+Sebelum lanjut, **pastikan file sudah sesuai format**:
+
+- [ ] Baris pertama `Judul: ...`, lalu `Khatib: ...`, lalu `---`
+- [ ] Tidak ada muqaddimah, *aqulu qauli hadza…*, atau khutbah kedua
+  (sudah otomatis ditambahkan aplikasi)
+- [ ] Setiap dalil berada di baris berawalan `>`: teks Arab, lalu
+  `"terjemahan" (QS./HR. ...)`
+- [ ] Satu paragraf per baris, tanpa timestamp atau markdown (`#`, `**`)
+- [ ] **Teks Arab dan nomor ayat/hadits sudah dicek** dengan mushaf /
+  sumber terpercaya — AI bisa keliru
+
+Detail format ada di bagian [Input](#input).
+
+### Langkah 3 — Generate PDF
+
+Lihat [Cara pakai](#cara-pakai) di bawah.
 
 ## Cara pakai
 
@@ -138,10 +195,13 @@ Pada teks bacaan Arab, baris kosong memisahkan paragraf.
 ## Struktur projek
 
 ```
-khutbah-generator/
+friday-sermon-generator/
 ├── main.py            # script generator
 ├── requirements.txt
+├── prompts/
+│   └── transcript-to-khutbah.md  # template prompt transkrip → input
+├── transcripts/       # transkrip mentah (opsional, diabaikan git)
 ├── inputs/
 │   └── example.txt    # contoh isi khutbah
-└── outputs/           # hasil PDF (diabaikan git)
+└── outputs/           # hasil PDF
 ```
